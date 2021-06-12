@@ -72,10 +72,11 @@ class MiniDiscordServerManager:
             "created_at":str(time()),
             "owner":str(creator_id),
             "members":[creator_id],
-            "messages":{
+            "messages":[{
                 "id":self.__generate_id__({}),
-                "text":"Welcome to your new server!"
-            }
+                "text":"Welcome to your new server!",
+                "sender":str(creator_id),
+            }]
         }
         # update db
         db[id]=data
@@ -110,7 +111,7 @@ class MiniDiscordServerManager:
         # Else return data
         return owned
 
-    # join server
+    # join/leave server
     def __server_attatchment__(self, member_id, server_id, join):
         # grab db
         db = self.__opendb__()
@@ -125,3 +126,29 @@ class MiniDiscordServerManager:
         # commit and close
         self.__writedb__(db)
         return True
+
+    # send message
+    def __send_message__(self, member_id, server_id, message):
+        # grab db
+        db = self.__opendb__()
+        # grab used ids
+        previous_ids = {}
+        for msg in db[server_id]["messages"]:
+            previous_ids[msg['id']] = True
+        # generate new id
+        new_id = self.__generate_id__(previous_ids)
+        db[server_id]["messages"].append({
+                "id":new_id,
+                "text":message,
+                "sender":str(member_id),
+        })
+        # update db
+        self.__writedb__(db)
+        # return list of members to ping
+        to_ping = []
+        for member in db[server_id]['members']:
+            # don't include self
+            if member != member_id:
+                to_ping.append(member)
+        # return
+        return to_ping

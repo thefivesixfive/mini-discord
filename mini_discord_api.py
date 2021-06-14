@@ -9,14 +9,15 @@ from time import time
 def log(text):
     logmsg = f"[/] {text}"
     print(logmsg)
-    with open("logs.txt", "a+") as file:
+    with open("apilogs.txt", "a+") as file:
         file.write(logmsg+"\n")
 
 # server management
 class MiniDiscordServerManager:
 
     # global vars
-    ALPHANUMERIC = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890-_"
+    ALPHANUMERIC = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890"
+    # ^^^ around 916 million combonations for 5 digit IDs
 
     # Establish Database Location
     def __init__(self):
@@ -50,7 +51,7 @@ class MiniDiscordServerManager:
         id_exists = True
         while id_exists:
             id = ""
-            for x in range(0, 20):
+            for x in range(0, 5):
                 id += choice(MiniDiscordServerManager.ALPHANUMERIC)
             # check to see if ID exists
             try:
@@ -72,6 +73,7 @@ class MiniDiscordServerManager:
             "created_at":str(time()),
             "owner":str(creator_id),
             "members":[creator_id],
+            "verified":False,
             "messages":[{
                 "id":self.__generate_id__({}),
                 "text":"Welcome to your new server!",
@@ -84,19 +86,25 @@ class MiniDiscordServerManager:
         self.__writedb__(db)
         # log
         log(f"Added {name} ({id}) to database")
+        # return id
+        return id
     
     # delete server
     def __delete_server__(self, requester_id, server_id):
         # grab current servers
         db = self.__opendb__()
         # grab server by id and delete
-        if (db[id]==server_id) and (db[id]["owner"]==str(server_id)):
-            del db[id] # delete
-            self.__writedb__(db) # commit to database
-            log(f'Deleted {data["name"]} ({id}) from the database.') # log
-            return True # return
-        # if there was no servers
-        return False
+        if server_id in list(db.keys()):
+            if db[server_id]["owner"]==str(requester_id):
+                log(f'Deleted {db[server_id]["name"]} ({server_id}) from the database.') # log
+                del db[server_id] # delete
+                self.__writedb__(db) # commit to database
+                return True # return
+            else:
+                return False
+        else:
+            # if there was no servers
+            return None
     
     # present server info
     def __server_info__(self, owner_id):
@@ -115,17 +123,32 @@ class MiniDiscordServerManager:
     def __server_attatchment__(self, member_id, server_id, join):
         # grab db
         db = self.__opendb__()
+        # does server exist?
+        try:
+            db[server_id]
+        except KeyError:
+            return False
         # grab server and add / remove
         for id,data in db.items():
             # just to make sure that there will be no duplicates
             if join and (id==server_id) and (not str(member_id) in data["members"]):
                 db[server_id]["members"].append(str(member_id))
+                # log
+                log(f"Added {member_id} to ({server_id})")
             # to remove
             elif (not join) and (id==server_id) and (str(member_id) in data["members"]):
                 db[server_id]["members"].remove(str(member_id))
+                # log
+                log(f"Removed {member_id} from ({server_id})")
         # commit and close
         self.__writedb__(db)
         return True
+
+    # servers
+    def __servers__(self):
+        # grab db
+        db = self.__opendb__()
+        return db
 
     # send message
     def __send_message__(self, member_id, server_id, message):
@@ -150,5 +173,7 @@ class MiniDiscordServerManager:
             # don't include self
             if member != member_id:
                 to_ping.append(member)
+        # log
+            log(f"Sent \'{message}\' to ({server_id})")
         # return
         return to_ping
